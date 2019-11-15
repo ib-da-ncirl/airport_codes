@@ -1,0 +1,6 @@
+dagster>=0.6.4
+dagit>=0.6.4
+git+https://github.com/ib-da-ncirl/dagster_toolkit.git#egg=dagster_toolkit
+git+https://github.com/ib-da-ncirl/db_toolkit.git#egg=db_toolkit
+Menu>=3.2.2
+

@@ -22,10 +22,11 @@
 import os
 
 
-def get_file_path(environ):
+def get_file_path(environ, req_file_desc):
     """
     Get a file path, either from an environment variable or input
     :param environ: Environment variable to
+    :param req_file_desc: Description of required file
     :return: file path or None
     """
     filename = None
@@ -40,8 +41,9 @@ def get_file_path(environ):
             approve = 'y'
 
     if approve != 'q':
+        print(f"Current directory is: {os.getcwd()}")
         while filename is None:
-            filename = input("Enter path to UN/LOCODE zip file [or 'q' to quit]: ")
+            filename = input(f"Enter path to {req_file_desc} [or 'q' to quit]: ")
             if filename.lower() == 'q':
                 filename = None
                 break

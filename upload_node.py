@@ -19,36 +19,110 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from db_toolkit.mongo import MongoDb
+from dagster_toolkit.mongo.connection import get_mongo
+from dagster_toolkit.postgres.connection import get_postgres
 from dagster import solid
+from db_toolkit.postgres.postgresdb_sql import does_table_exist_sql
+from db_toolkit.postgres.postgresdb_sql import count_sql
+from db_toolkit.postgres.postgresdb_sql import estimate_count_sql
+from psycopg2.extras import execute_values
 
 
 @solid
 def upload_to_mongo(context, df, server_cfg):
     """
     Upload panda DataFrame to MongoDB server
+    :param context: execution context
     :param df: DataFrame
     :param server_cfg: path to server configuration
     :return: dictionary of panda DataFrames
     :rtype: dict
     """
 
-    client = MongoDb(cfg_filename=server_cfg)
+    client = get_mongo(context, server_cfg)
 
-    if client.is_authenticated():
+    if client is not None:
+        # set database
         db = client.get_connection()[client['dbname']]
+        # set collection in database
         collection = db[client['collection']]
 
         # convert the DataFrame to a list like [{column -> value}, … , {column -> value}]
         # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_dict.html
         entries = df.to_dict(orient='records')
 
+        context.log.info(f'Record upload in progress')
         result = collection.insert_many(entries)
 
+        context.log.info(f'Uploaded {len(result.inserted_ids)} records')
 
-    context.log.info(
-        f'Loaded {len(df)} files'
-    )
+        # tidy up
+        client.close_connection()
+
+    return df
+
+@solid
+def upload_to_postgres(context, df, server_cfg):
+    """
+    Upload panda DataFrame to Postgres server
+    :param context: execution context
+    :param df: DataFrame
+    :param server_cfg: path to server configuration
+    :return: dictionary of panda DataFrames
+    :rtype: dict
+    """
+
+    client = get_postgres(context, server_cfg)
+
+    if client is not None:
+
+        cursor = client.cursor()
+
+        try:
+            # this is a one time op so if table exists delete it and recreate
+            cursor.execute('DROP TABLE IF EXISTS airport_codes')
+
+            # create table
+            create_table_query = '''CREATE TABLE IF NOT EXISTS airport_codes (
+                        id           SERIAL PRIMARY KEY,
+                        country_code TEXT   NOT NULL,
+                        name_local   TEXT   NOT NULL,
+                        name         TEXT   NOT NULL,
+                        iata         TEXT   NOT NULL,
+                        geo_coord    TEXT,
+                        country      TEXT   NOT NULL
+                        ); '''
+            cursor.execute(create_table_query)
+
+            insert_query = """ INSERT INTO airport_codes (
+                            country_code,
+                            name_local,
+                            name,
+                            iata,
+                            geo_coord,
+                            country
+                            ) VALUES %s"""
+            tuples = [tuple(x) for x in df.values]
+
+            # execute_values doesn't return much, so calc existing & post-insert count
+            # airport_codes won't be big so use count_sql, for big tables estimate using estimate_count_sql
+            cursor.execute(count_sql('airport_codes'))
+            result = cursor.fetchone()
+            pre_len = result[0]
+
+            execute_values(cursor, insert_query, tuples)
+            client.commit()
+
+            cursor.execute(count_sql('airport_codes'))
+            result = cursor.fetchone()
+            post_len = result[0]
+
+            context.log.info(f'Uploaded {post_len - pre_len} records')
+
+        finally:
+            # tidy up
+            cursor.close()
+            client.close_connection()
 
     return df
 

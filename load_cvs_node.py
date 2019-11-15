@@ -19,7 +19,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import csv
 import re
 from zipfile import ZipFile
 import pandas as pd
@@ -33,7 +32,7 @@ def load_csv_from_zip(context, zip_path, pattern, encoding, header):
     """
     Load csv files from a zip file into a dictionary of panda DataFrames,
     where the filename matches the specified pattern
-    :param context: context object
+    :param context: execution context
     :param zip_path: path to zip file
     :param pattern: regex pattern to match csv files in zip file
     :param encoding: encoding to use when reading csv files
@@ -51,14 +50,13 @@ def load_csv_from_zip(context, zip_path, pattern, encoding, header):
     zip_file = ZipFile(zip_path)
     df = {
         file.filename: pd.read_csv(
-            zip_file.open(file.filename), encoding=encoding, names=header)
+            # Namibia has the country code 'NA' which is treated as Nan by default, so disable default
+            zip_file.open(file.filename), encoding=encoding, names=header, keep_default_na=False)
         for file in zip_file.infolist()
         if regex.match(file.filename)
     }
 
-    context.log.info(
-        f'Loaded {len(df)} files'
-    )
+    context.log.info(f'Loaded {len(df)} files')
 
     return df
 
@@ -67,7 +65,7 @@ def load_csv_from_zip(context, zip_path, pattern, encoding, header):
 def combine_csv_from_dict(context, df_dict):
     """
     Combine a dictionary of panda DataFrames into a single DataFrame
-    :param context: context object
+    :param context: execution context
     :param df_dict: dictionary of panda DataFrames
     :return: panda DataFrame or None
     :rtype: dict
@@ -80,8 +78,6 @@ def combine_csv_from_dict(context, df_dict):
         for key in df_dict.keys():
             df = df.append(df_dict[key])
 
-    context.log.info(
-        f'Merged {df_count} DataFrames'
-    )
+    context.log.info(f'Merged {df_count} DataFrames')
 
     return df
