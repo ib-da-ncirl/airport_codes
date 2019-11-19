@@ -15,6 +15,7 @@ Please see https://packaging.python.org/tutorials/installing-packages/ for gener
 The following packages are required:
 * [dagster](https://github.com/dagster-io/dagster)
 * [db_toolkit](https://github.com/ib-da-ncirl/db_toolkit)
+* [pandas](https://pandas.pydata.org/)
 * [dagster_toolkit](https://github.com/ib-da-ncirl/db_toolkit)
 * [Menu](https://pypi.org/project/Menu/)
 
