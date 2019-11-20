@@ -19,15 +19,27 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from dagster import execute_pipeline, pipeline
+from dagster import (
+    execute_pipeline,
+    pipeline,
+    ModeDefinition
+)
 from menu import Menu
 
-from miscx.io import get_file_path
-from load_cvs_node import load_csv_from_zip
-from load_cvs_node import combine_csv_from_dict
-from upload_node import upload_to_mongo
-from upload_node import upload_to_postgres
-from dagster_toolkit.mongo.download_node import download_from_mongo
+from db_toolkit.misc.get_env import get_file_path
+from load_cvs_node import (
+    load_csv_from_zip,
+    combine_csv_from_dict
+)
+from dagster_toolkit.postgres import postgres_warehouse_resource
+from dagster_toolkit.mongo import (
+    mongo_warehouse_resource,
+    download_from_mongo
+)
+from upload_node import (
+    upload_to_mongo,
+    upload_to_postgres
+)
 from process_node import process_unlocode
 
 """
@@ -36,13 +48,34 @@ from process_node import process_unlocode
     https://service.unece.org/trade/locode/2019-1_UNLOCODE_SecretariatNotes.pdf
 """
 
-@pipeline
+
+@pipeline(
+    mode_defs=[
+        ModeDefinition(
+            # attach resources to pipeline
+            resource_defs={
+                'mongo_warehouse': mongo_warehouse_resource
+            }
+        )
+    ]
+)
 def csv_to_mongo_pipeline():
     df_dict = load_csv_from_zip()
     df = combine_csv_from_dict(df_dict)
     upload_to_mongo(df)
 
-@pipeline
+
+@pipeline(
+    mode_defs=[
+        ModeDefinition(
+            # attach resources to pipeline
+            resource_defs={
+                'postgres_warehouse': postgres_warehouse_resource,
+                'mongo_warehouse': mongo_warehouse_resource
+            }
+        )
+    ]
+)
 def mongo_to_postgres_pipeline():
     raw = download_from_mongo()
     processed = process_unlocode(raw)
@@ -56,13 +89,17 @@ if __name__ == '__main__':
     if filename is None:
         exit(0)
     # get path to mongodb config file
-    mongo_cfg = get_file_path('MONGO_CFG', 'MongoDb configuration file')
+    mongo_cfg = get_file_path('MONGO_CFG', 'mongoDB configuration file')
     if mongo_cfg is None:
         exit(0)
     # get path to postgres config file
     postgres_cfg = get_file_path('POSTGRES_CFG', 'Postgres configuration file')
     if postgres_cfg is None:
         exit(0)
+
+    # resource entries for environment_dict
+    postgres_warehouse = {'config': {'postgres_cfg': postgres_cfg}}
+    mongo_warehouse = {'config': {'mongo_cfg': mongo_cfg}}
 
     # names of columns in UN/LOCODE data
     unlocode_header = (
@@ -87,7 +124,7 @@ if __name__ == '__main__':
 
         def execute_csv_to_mongo_pipeline():
             """
-            Execute the pipeline to upload the UN/LOCODE data from the zipped csv files to MongoDb
+            Execute the pipeline to upload the UN/LOCODE data from the zipped csv files to mongoDB
             """
             # environment dictionary
             csv_to_mongo_env_dict = {
@@ -99,12 +136,10 @@ if __name__ == '__main__':
                             'encoding': {'value': 'latin_1'},
                             'header': {'value': unlocode_header}
                         }
-                    },
-                    'upload_to_mongo': {
-                        'inputs': {
-                            'server_cfg': {'value': mongo_cfg}
-                        }
                     }
+                },
+                'resources': {
+                    'mongo_warehouse': mongo_warehouse
                 }
             }
             result = execute_pipeline(csv_to_mongo_pipeline, environment_dict=csv_to_mongo_env_dict)
@@ -112,23 +147,21 @@ if __name__ == '__main__':
 
         def execute_mongo_to_postgres_pipeline():
             """
-            Execute the pipeline to retrieve the data from MongoDb, process and save the result to Postgres
+            Execute the pipeline to retrieve the data from mongoDB, process and save the result to Postgres
             """
             # environment dictionary
             mongo_to_postgres_env_dict = {
                 'solids': {
                     'download_from_mongo': {
                         'inputs': {
-                            'server_cfg': {'value': mongo_cfg},
                             'sel_filter': {'value': {}},
                             'projection': {'value': exclude_fields}
                         }
-                    },
-                    'upload_to_postgres': {
-                        'inputs': {
-                            'server_cfg': {'value': postgres_cfg}
-                        }
                     }
+                },
+                'resources': {
+                    'postgres_warehouse': postgres_warehouse,
+                    'mongo_warehouse': mongo_warehouse
                 }
             }
             result = execute_pipeline(mongo_to_postgres_pipeline, environment_dict=mongo_to_postgres_env_dict)

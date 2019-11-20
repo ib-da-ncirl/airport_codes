@@ -19,8 +19,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from dagster_toolkit.mongo.connection import get_mongo
-from dagster_toolkit.postgres.connection import get_postgres
 from dagster import solid
 from db_toolkit.postgres.postgresdb_sql import does_table_exist_sql
 from db_toolkit.postgres.postgresdb_sql import count_sql
@@ -28,24 +26,21 @@ from db_toolkit.postgres.postgresdb_sql import estimate_count_sql
 from psycopg2.extras import execute_values
 
 
-@solid
-def upload_to_mongo(context, df, server_cfg):
+@solid(required_resource_keys={'mongo_warehouse'})
+def upload_to_mongo(context, df):
     """
-    Upload panda DataFrame to MongoDB server
+    Upload panda DataFrame to mongoDB server
     :param context: execution context
     :param df: DataFrame
-    :param server_cfg: path to server configuration
     :return: dictionary of panda DataFrames
     :rtype: dict
     """
 
-    client = get_mongo(context, server_cfg)
+    client = context.resources.mongo_warehouse.get_connection(context)
 
     if client is not None:
-        # set database
-        db = client.get_connection()[client['dbname']]
-        # set collection in database
-        collection = db[client['collection']]
+        # get database collection
+        collection = client.get_collection()
 
         # convert the DataFrame to a list like [{column -> value}, … , {column -> value}]
         # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_dict.html
@@ -61,18 +56,18 @@ def upload_to_mongo(context, df, server_cfg):
 
     return df
 
-@solid
-def upload_to_postgres(context, df, server_cfg):
+
+@solid(required_resource_keys={'postgres_warehouse'})
+def upload_to_postgres(context, df):
     """
     Upload panda DataFrame to Postgres server
     :param context: execution context
     :param df: DataFrame
-    :param server_cfg: path to server configuration
     :return: dictionary of panda DataFrames
     :rtype: dict
     """
 
-    client = get_postgres(context, server_cfg)
+    client = context.resources.postgres_warehouse.get_connection(context)
 
     if client is not None:
 
@@ -104,8 +99,8 @@ def upload_to_postgres(context, df, server_cfg):
                             ) VALUES %s"""
             tuples = [tuple(x) for x in df.values]
 
-            # execute_values doesn't return much, so calc existing & post-insert count
-            # airport_codes won't be big so use count_sql, for big tables estimate using estimate_count_sql
+            # psycopg2.extras.execute_values() doesn't return much, so calc existing & post-insert count
+            # airport_codes won't be big, so use count_sql, for big tables estimate using estimate_count_sql
             cursor.execute(count_sql('airport_codes'))
             result = cursor.fetchone()
             pre_len = result[0]
