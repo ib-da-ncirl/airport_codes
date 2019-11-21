@@ -53,8 +53,8 @@ def process_unlocode(context, df):
 
         # entries with no 'code' value are country headings or names that have been changed
         # e.g. lo code name_local         name               function iata geo_coord
-        #      AD nan  .ANDORRA           nan                nan      nan  nan nan
-        #      AE nan  Ruwais = Ar Ruways Ruwais = Ar Ruways nan      nan  nan nan
+        #      AD      .ANDORRA
+        #      AE      Ruwais = Ar Ruways Ruwais = Ar Ruways
 
         # generate a dict of country ids
         # no 'code' value dataframe

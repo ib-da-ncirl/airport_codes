@@ -39,15 +39,16 @@ def upload_to_mongo(context, df):
     client = context.resources.mongo_warehouse.get_connection(context)
 
     if client is not None:
-        # get database collection
-        collection = client.get_collection()
-
         # convert the DataFrame to a list like [{column -> value}, … , {column -> value}]
         # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_dict.html
         entries = df.to_dict(orient='records')
 
         context.log.info(f'Record upload in progress')
-        result = collection.insert_many(entries)
+
+        # use the insert_many() method on the MongoDb client rather than the collection, as if an azure server is
+        # being used there might be a BulkWriteError if the throughput (RU/s) is exceeded.
+        # MongoDb.insert_many() will attempt to continue in a slower batch mode
+        result = client.insert_many(entries)
 
         context.log.info(f'Uploaded {len(result.inserted_ids)} records')
 
