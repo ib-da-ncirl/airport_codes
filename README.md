@@ -14,8 +14,8 @@ Please see https://packaging.python.org/tutorials/installing-packages/ for gener
 
 The following packages are required:
 * [dagster](https://github.com/dagster-io/dagster)
-* [db_toolkit](https://github.com/ib-da-ncirl/db_toolkit)
 * [pandas](https://pandas.pydata.org/)
+* [db_toolkit](https://github.com/ib-da-ncirl/db_toolkit)
 * [dagster_toolkit](https://github.com/ib-da-ncirl/db_toolkit)
 * [Menu](https://pypi.org/project/Menu/)
 
@@ -26,12 +26,10 @@ Install dependencies via
 
 ## Setup
 
-* Specify the path to the UN/LOCODE zip file, in the environment variable **UNLOCODE_PATH**.
-* Create a configuration file for the mongoDb server, following the format outlined in [mongo_cfg.sample](https://github.com/ib-da-ncirl/db_toolkit/blob/master/db_toolkit/docs/mongo_cfg.sample).
-* Specify the path to the configuration file, in the environment variable **MONGO_CFG**.
-* Create a configuration file for the Postgres server, following the format outlined in [postgres_cfg.sample](https://github.com/ib-da-ncirl/db_toolkit/blob/master/db_toolkit/docs/postgres_cfg.sample).
-* Specify the path to the configuration file, in the environment variable **POSTGRES_CFG**.
-* Alternatively, each parameter may be entered via the console.
+The application may be supplied by one of the following methods:
+* Create a YAML configuration file named config.yaml, based on [sample.yaml](airport_codes/doc/sample.yaml), in the project root.
+* Specify the path to the YAML configuration file, in the environment variable **AC_CFG**.
+* Enter the path to the YAML configuration file via the console.
 
 ## Execution
 
