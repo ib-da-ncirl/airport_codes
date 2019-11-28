@@ -23,7 +23,6 @@ Install dependencies via
 
     pip install -r requirements.txt
 
-
 ## Setup
 
 The application may be supplied by one of the following methods:
