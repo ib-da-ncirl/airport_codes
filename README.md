@@ -26,7 +26,7 @@ Install dependencies via
 ## Setup
 
 The application may be supplied by one of the following methods:
-* Create a YAML configuration file named config.yaml, based on [sample.yaml](airport_codes/doc/sample.yaml), in the project root.
+* Create a YAML configuration file named config.yaml, based on [sample.yaml](doc/sample.yaml), in the project root.
 * Specify the path to the YAML configuration file, in the environment variable **AC_CFG**.
 * Enter the path to the YAML configuration file via the console.
 
