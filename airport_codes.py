@@ -1,5 +1,5 @@
 # The MIT License (MIT)
-# Copyright (c) 2019 Ian Buttimer
+# Copyright (c) 2019-2021 Ian Buttimer
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -48,11 +48,17 @@ from upload_node import (
     upload_to_postgres
 )
 from process_node import process_unlocode
+from constants import (
+    COL_CHANGE, COL_LO, COL_CODE, COL_LOCAL, COL_NAME, COL_DIVISION,
+    COL_FUNCTION, COL_STATUS, COL_DATE, COL_IATA, COL_COORD, COL_REMARK
+)
 
 """
-    For information regarding UN/LOCODE, see https://www.unece.org/cefact/locode/welcome.html
-    For information regarding the data format, see https://service.unece.org/trade/locode/UNLOCODE_Manual.pdf and 
-    https://service.unece.org/trade/locode/2019-1_UNLOCODE_SecretariatNotes.pdf
+    For information regarding UN/LOCODE, see 
+    https://www.unece.org/cefact/locode/welcome.html
+    For information regarding the data format, see 
+    https://unece.org/DAM/cefact/locode/UNLOCODE_Manual.pdf and 
+    '2021-1 UNLOCODE SecretariatNotes.pdf' in data/loc211csv.zip
 """
 
 
@@ -92,10 +98,11 @@ def mongo_to_postgres_pipeline():
 if __name__ == '__main__':
 
     # get path to config file
-    app_cfg_path = 'config.yaml'    # default in project root
+    app_cfg_path = 'config.yaml'  # default in project root
     if not test_file_path(app_cfg_path):
         # no default so look for in environment or from console
-        app_cfg_path = get_file_path('AC_CFG', 'AirportCodes configuration file')
+        app_cfg_path = get_file_path('AC_CFG',
+                                     'AirportCodes configuration file')
         if app_cfg_path is None:
             exit(0)
 
@@ -103,72 +110,81 @@ if __name__ == '__main__':
 
     if app_cfg is not None:
         # check some basic configs exist
-        for key in ['airport_codes', 'postgresdb', 'mongodb']:     # required root level keys
+        for key in ['airport_codes', 'postgresdb',
+                    'mongodb']:  # required root level keys
             if key not in app_cfg.keys():
                 raise EnvironmentError(f'Missing {key} configuration key')
     else:
         raise EnvironmentError(f'Missing configuration')
 
-    # resource entries for environment_dict
+    # resource entries for run_config
     postgres_warehouse = {'config': {'postgres_cfg': app_cfg['postgresdb']}}
     mongo_warehouse = {'config': {'mongo_cfg': app_cfg['mongodb']}}
 
     # names of columns in UN/LOCODE data
     unlocode_header = (
-        'change',       # change indicator that shows if the entry has been modified in any way
-        'lo',           # the ISO 3166 alpha-2 Country Code
-        'code',         # a 3-character code for the place name
-        'name_local',   # place name, whenever possible, in their national language
-        'name',         # place name, without diacritic signs
-        'subdivision',  # ISO 1-3 character code for the administrative division of the country, as per ISO 3166-2/1998
-        'function',     # 1-digit function classifier code for the location
-        'status',       # status of the entry
-        'date',         # reference date, showing the year and month of request
-        'iata',         # IATA code for the location if different from location code
-        'geo_coord',    # geographical coordinates (latitude/longitude), ddmmN dddmmW, ddmmS dddmmE, etc., where the
-                        # two last digits refer to minutes and the two or three first digits indicate the degrees
-        'remark'        # reasons for the change
+        COL_CHANGE,
+        COL_LO,
+        COL_CODE,
+        COL_LOCAL,
+        COL_NAME,
+        COL_DIVISION,
+        COL_FUNCTION,
+        COL_STATUS,
+        COL_DATE,
+        COL_IATA,
+        COL_COORD,
+        COL_REMARK
     )
     # field not required from mongo
-    exclude_fields = {'_id': 0, 'change': 0, 'subdivision': 0, 'status': 0, 'date': 0, 'remark': 0}
+    exclude_fields = {'_id': 0, COL_CHANGE: 0, COL_DIVISION: 0, COL_STATUS: 0,
+                      COL_DATE: 0, COL_REMARK: 0}
+
 
     def execute_csv_to_mongo_pipeline():
         """
-        Execute the pipeline to upload the UN/LOCODE data from the zipped csv files to mongoDB
+        Execute the pipeline to upload the UN/LOCODE data from the zipped csv
+        files to mongoDB
         """
         # environment dictionary
         env_dict = EnvironmentDict() \
-            .add_solid_input('load_csv_from_zip', 'zip_path', app_cfg['airport_codes']['unlocode_zip']) \
-            .add_solid_input('load_csv_from_zip', 'pattern', r'.*UNLOCODE CodeListPart\d*\.csv') \
+            .add_solid_input('load_csv_from_zip', 'zip_path',
+                             app_cfg['airport_codes']['unlocode_zip']) \
+            .add_solid_input('load_csv_from_zip', 'pattern',
+                             r'.*UNLOCODE CodeListPart\d*\.csv') \
             .add_solid_input('load_csv_from_zip', 'encoding', 'latin_1') \
             .add_solid_input('load_csv_from_zip', 'header', unlocode_header) \
             .add_resource('mongo_warehouse', mongo_warehouse) \
             .build()
-        result = execute_pipeline(csv_to_mongo_pipeline, environment_dict=env_dict)
+        result = execute_pipeline(csv_to_mongo_pipeline, run_config=env_dict)
         assert result.success
+
 
     def execute_mongo_to_postgres_pipeline():
         """
-        Execute the pipeline to retrieve the data from mongoDB, process and save the result to Postgres
+        Execute the pipeline to retrieve the data from mongoDB, process and
+        save the result to Postgres
         """
         # environment dictionary
         env_dict = EnvironmentDict() \
             .add_solid_input('download_from_mongo', 'sel_filter', {}) \
-            .add_solid_input('download_from_mongo', 'projection', exclude_fields) \
+            .add_solid_input('download_from_mongo', 'projection',
+                             exclude_fields) \
             .add_resource('postgres_warehouse', postgres_warehouse) \
             .add_resource('mongo_warehouse', mongo_warehouse) \
             .build()
-        result = execute_pipeline(mongo_to_postgres_pipeline, environment_dict=env_dict)
+        result = execute_pipeline(mongo_to_postgres_pipeline,
+                                  run_config=env_dict)
         assert result.success
+
 
     menu = Menu()
     menu.set_options([
         ("Save UN/LOCODE raw data to MongoDb", execute_csv_to_mongo_pipeline),
-        ("Process UN/LOCODE raw data from MongoDb, and save to Postgres", execute_mongo_to_postgres_pipeline),
+        ("Process UN/LOCODE raw data from MongoDb, and save to Postgres",
+         execute_mongo_to_postgres_pipeline),
         ("Exit", Menu.CLOSE)
     ])
     menu.set_title("UN/LOCODE Data Processing Menu")
     menu.set_title_enabled(True)
     menu.open()
-
-
